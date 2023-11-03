@@ -1,12 +1,6 @@
 import pygame
 from enum import Enum
 
-
-class Axis(Enum):
-    X = 'x'
-    Y = 'y'
-
-
 pygame.init()
 
 # Setting up variables
@@ -19,6 +13,7 @@ y1_change = 0
 x_mult = 0
 y_mult = 0
 score = 0
+block = 10
 
 # Colors
 blue = (0, 0, 255)
@@ -30,20 +25,7 @@ pygame.display.update()
 pygame.display.set_caption('Snake game by Aumesh')
 game_over = False
 direction = Axis.X
-
-
-def adjustDirection(directionTowards: Axis, x_mult: int, y_mult: int):
-    if (directionTowards == Axis.X):
-        if (x_mult < score):
-            x_mult += 1
-        if (y_mult > 0):
-            y_mult -= 1
-    elif (directionTowards == Axis.Y):
-        if (y_mult < score):
-            y_mult += 1
-        if (x_mult > 0):
-            x_mult -= 1
-    return x_mult, y_mult
+snake_body = []
 
 
 def displayTitle():
@@ -61,26 +43,18 @@ while not game_over:
             game_over = True
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_LEFT:
-                x1_change = -10
+                x1_change = -block
                 y1_change = 0
-                direction = Axis.X
             elif event.key == pygame.K_RIGHT:
-                x1_change = 10
+                x1_change = block
                 y1_change = 0
-                direction = Axis.X
             elif event.key == pygame.K_UP:
-                y1_change = -10
+                y1_change = -block
                 x1_change = 0
-                direction = Axis.Y
             elif event.key == pygame.K_DOWN:
-                y1_change = 10
+                y1_change = block
                 x1_change = 0
-                direction = Axis.Y
-    x_mult, y_mult = adjustDirection(direction, x_mult, y_mult)
-    if x1 <= 0 or x1 >= width:
-        displayTitle()
-        game_over = True
-    elif y1 <= 0 or y1 >= height:
+    if x1 <= 0 or x1 >= width or y1 <= 0 or y1 >= height:
         displayTitle()
         game_over = True
     else:
@@ -89,13 +63,13 @@ while not game_over:
         dis.fill(white)
         if (x1 == 100 and y1 == 100):
             score += 1
-            if direction == Axis.X:
-                x_mult += 1
-            if direction == Axis.Y:
-                y_mult += 1
-        pygame.draw.rect(dis, red, [100, 100, 10, 10])  # draw food
-        pygame.draw.rect(
-            dis, blue, [x1, y1, 10 + (10*x_mult), 10 + (10*y_mult)])
+        pygame.draw.rect(dis, red, [100, 100, block, block])  # draw food
+        snake_body.append([x1, y1])
+        if (len(snake_body) > score+1):
+            del snake_body[0]
+        for x in snake_body:
+            pygame.draw.rect(
+                dis, blue, [x[0], x[1], block, block])
         pygame.display.update()
         clock.tick(20)
 
