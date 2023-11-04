@@ -4,35 +4,31 @@ import numpy as np
 import random
 import tensorflow as tf
 
-from tf_agents.agents.dqn import dqn_agent
-from tf_agents.drivers import py_driver
-from tf_agents.environments import suite_gym
+# from tf_agents.agents.dqn import dqn_agent
+# from tf_agents.drivers import py_driver
+# from tf_agents.environments import suite_gym
 from tf_agents.environments import tf_py_environment
-from tf_agents.eval import metric_utils
-from tf_agents.metrics import tf_metrics
-from tf_agents.networks import sequential
-from tf_agents.policies import py_tf_eager_policy
-from tf_agents.policies import random_tf_policy
-from tf_agents.replay_buffers import reverb_replay_buffer
-from tf_agents.replay_buffers import reverb_utils
-from tf_agents.trajectories import trajectory
-from tf_agents.specs import tensor_spec
-from tf_agents.utils import common
+# from tf_agents.eval import metric_utils
+# from tf_agents.metrics import tf_metrics
+# from tf_agents.networks import sequential
+# from tf_agents.policies import py_tf_eager_policy
+# from tf_agents.policies import random_tf_policy
+# from tf_agents.replay_buffers import reverb_replay_buffer
+# from tf_agents.replay_buffers import reverb_utils
+# from tf_agents.trajectories import trajectory
+# from tf_agents.specs import tensor_spec
+# from tf_agents.utils import common
 
-
-class SnakeGame(tf_py_environment.PyEnvironment):
-    def __init__(self):
-        pygame.init()
-
-    def reset(self):
-        print('hi')
-
+# Colors
+blue = (0, 0, 255)
+red = (255, 0, 0)
+white = (255, 255, 255)
 
 # hyperparameters (copied from https://www.tensorflow.org/agents/tutorials/1_dqn_tutorial)
 num_iterations = 20000  # @param {type:"integer"}
 
-initial_collect_steps = 100  # @param {type:"integer"}
-collect_steps_per_iteration = 1  # @param {type:"integer"}
+initial_collect_step_counts = 100  # @param {type:"integer"}
+collect_step_counts_per_iteration = 1  # @param {type:"integer"}
 replay_buffer_max_length = 100000  # @param {type:"integer"}
 
 batch_size = 64  # @param {type:"integer"}
@@ -43,9 +39,6 @@ num_eval_episodes = 10  # @param {type:"integer"}
 eval_interval = 1000  # @param {type:"integer"}
 
 
-pygame.init()
-
-
 class ActionSpace(Enum):
     UP = 'up'
     DOWN = 'down'
@@ -53,114 +46,110 @@ class ActionSpace(Enum):
     LEFT = 'left'
 
 
-# Setting up variables
-width: int = 400
-height: int = 400
-x1: int = width/2
-y1: int = height/2
-x1_change: int = 0
-y1_change: int = 0
-x_mult: int = 0
-y_mult: int = 0
-score: int = 0
-block: int = 10
-food_x: int = 100
-food_y: int = 100
+class SnakeGame(tf_py_environment.TFPyEnvironment):
+    def __init__(self):
+        pygame.init()
+        self.width: int = 400
+        self.height: int = 400
+        self.x1 = self.width/2
+        self.y1 = self.height/2
+        self.clock = pygame.time.Clock()
+        self.dis = None
+        self.food_x = 0
+        self.food_y = 0
+        self.block = 10
+        self.snake_body = []
+        self.score = 0
+        self.step_count = 0
+        self.reward = 0
+        self.game_over = False
+        self.action_space = [ActionSpace.UP, ActionSpace.DOWN,
+                             ActionSpace.RIGHT, ActionSpace.LEFT]
 
-# Colors
-blue = (0, 0, 255)
-red = (255, 0, 0)
-white = (255, 255, 255)
+    def reset(self):
+        self.dis = pygame.display.set_mode((self.width, self.height))
+        pygame.display.update()
+        pygame.display.set_caption('Snake game by Aumesh')
 
-dis = pygame.display.set_mode((width, height))
-pygame.display.update()
-pygame.display.set_caption('Snake game by Aumesh')
-game_over = False
-snake_body = []
+    def displayGameOver(self):
+        fontTitle = pygame.font.SysFont("arial", 24)
+        textTitle = fontTitle.render("Game Over", True, red)
+        rectTitle = textTitle.get_rect(center=self.dis.get_rect().center)
+        self.dis.blit(textTitle, rectTitle)
+        pygame.display.update()
 
-step = 0
-reward = 0
-action_space = [ActionSpace.UP, ActionSpace.DOWN,
-                ActionSpace.RIGHT, ActionSpace.LEFT]
+    def placeFood(self):
+        self.food_x = round(random.randrange(
+            0, self.width - self.block) / 10.0) * 10.0
+        self.food_y = round(random.randrange(
+            0, self.height - self.block) / 10.0) * 10.0
 
+    def playstep_count(self):
+        next_step_count: ActionSpace = np.random.choice(
+            self.action_space, size=1)
 
-def displayGameOver():
-    fontTitle = pygame.font.SysFont("arial", 24)
-    textTitle = fontTitle.render("Game Over", True, red)
-    rectTitle = textTitle.get_rect(center=dis.get_rect().center)
-    dis.blit(textTitle, rectTitle)
-    pygame.display.update()
+        # Random step_counts
+        match next_step_count:
+            case ActionSpace.UP:
+                self.y1 += -self.block
+            case ActionSpace.DOWN:
+                self.y1 += self.block
+            case ActionSpace.LEFT:
+                self.x1 += -self.block
+            case ActionSpace.RIGHT:
+                self.x1 += self.block
 
+        # Checking for quit
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.game_over = True
+                return self.score, self.reward, self.game_over
 
-clock = pygame.time.Clock()
+        # Checks out of bounds
+        if self.x1 <= 0 or self.x1 >= self.width or self.y1 <= 0 or self.y1 >= self.height:
+            self.displayGameOver()
+            self.reward -= 20
+            self.game_over = True
+            return self.score, self.reward, self.game_over
 
+        # Checks for collision with itself
+        for body_part in self.snake_body[:-1]:
+            if body_part[0] == self.x1 and body_part[1] == self.y1:
+                self.displayGameOver()
+                self.reward -= 20
+                self.game_over = True
+                return self.score, self.reward, self.game_over
 
-def playStep():
-    next_step: ActionSpace = np.random.choice(action_space, size=1)
+        self.dis.fill(white)
 
-    # Random steps
-    match next_step:
-        case ActionSpace.UP:
-            y1_change = -block
-            x1_change = 0
-        case ActionSpace.DOWN:
-            y1_change = block
-            x1_change = 0
-        case ActionSpace.LEFT:
-            x1_change = -block
-            y1_change = 0
-        case ActionSpace.RIGHT:
-            x1_change = block
-            y1_change = 0
+        # Randomizes food palcement after being eaten
+        if (self.x1 == self.food_x and self.y1 == self.food_y):
+            self.food_x = round(random.randrange(
+                0, self.width - self.block) / 10.0) * 10.0
+            self.food_y = round(random.randrange(
+                0, self.height - self.block) / 10.0) * 10.0
+            self.score += 1
+            self.reward += 10
 
-    # Checking for quit
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            game_over = True
-            return score, reward, game_over
-
-    # Checks out of bounds
-    if x1 <= 0 or x1 >= width or y1 <= 0 or y1 >= height:
-        displayGameOver()
-        reward -= 20
-        game_over = True
-        return score, reward, game_over
-
-    # Checks for collision with itself
-    for body_part in snake_body[:-1]:
-        if body_part[0] == x1 and body_part[1] == y1:
-            displayGameOver()
-            reward -= 20
-            game_over = True
-            return score, reward, game_over
-
-    x1 += x1_change
-    y1 += y1_change
-    dis.fill(white)
-
-    # Randomizes food palcement after being eaten
-    if (x1 == food_x and y1 == food_y):
-        food_x = round(random.randrange(
-            0, width - block) / 10.0) * 10.0
-        food_y = round(random.randrange(
-            0, height - block) / 10.0) * 10.0
-        score += 1
-        reward += 10
-
-    pygame.draw.rect(dis, red, [food_x, food_y, block, block])
-
-    # Draws snake body
-    snake_body.append([x1, y1])
-    if (len(snake_body) > score+1):
-        del snake_body[0]
-    for body_part in snake_body:
         pygame.draw.rect(
-            dis, blue, [body_part[0], body_part[1], block, block])
+            self.dis, red, [self.food_x, self.food_y, self.block, self.block])
 
-    pygame.display.update()
-    clock.tick(20)
-    return score, reward, game_over
+        # Draws snake body
+        self.snake_body.append([self.x1, self.y1])
+        if (len(self.snake_body) > self.score+1):
+            del self.snake_body[0]
+        for body_part in self.snake_body:
+            pygame.draw.rect(
+                self.dis, blue, [body_part[0], body_part[1], self.block, self.block])
+
+        pygame.display.update()
+        self.clock.tick(20)
+        return self.score, self.reward, self.game_over
 
 
-# pygame.quit()
-# quit()
+snake_game = SnakeGame()
+snake_game.reset()
+snake_game.placeFood()
+
+for i in range(0, 100):
+    snake_game.playstep_count()
