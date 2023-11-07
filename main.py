@@ -7,7 +7,9 @@ import tensorflow as tf
 # from tf_agents.agents.dqn import dqn_agent
 # from tf_agents.drivers import py_driver
 # from tf_agents.environments import suite_gym
-from tf_agents.environments import tf_py_environment
+from tf_agents.environments import tf_py_environment, py_environment
+from tf_agents.typing import types
+from tf_agents.specs import array_spec
 # from tf_agents.eval import metric_utils
 # from tf_agents.metrics import tf_metrics
 # from tf_agents.networks import sequential
@@ -46,7 +48,7 @@ class ActionSpace(Enum):
     LEFT = 'left'
 
 
-class SnakeGame(tf_py_environment.TFPyEnvironment):
+class SnakeGame(py_environment.PyEnvironment):
     def __init__(self):
         pygame.init()
         self.width: int = 400
@@ -63,10 +65,12 @@ class SnakeGame(tf_py_environment.TFPyEnvironment):
         self.step_count = 0
         self.reward = 0
         self.game_over = False
-        self.action_space = [ActionSpace.UP, ActionSpace.DOWN,
-                             ActionSpace.RIGHT, ActionSpace.LEFT]
+        self._action_spec = array_spec.ArraySpec.from_array(np.array((ActionSpace.UP, ActionSpace.DOWN,
+                                                                      ActionSpace.RIGHT, ActionSpace.LEFT)), name='action')
+        self._obervation_spec = array_spec.BoundedArraySpec(
+            shape=(4,), dtype=np.int32, name='observation')
 
-    def reset(self):
+    def _reset(self):
         self.dis = pygame.display.set_mode((self.width, self.height))
         pygame.display.update()
         pygame.display.set_caption('Snake game by Aumesh')
@@ -84,12 +88,9 @@ class SnakeGame(tf_py_environment.TFPyEnvironment):
         self.food_y = round(random.randrange(
             0, self.height - self.block) / 10.0) * 10.0
 
-    def playstep_count(self):
-        next_step_count: ActionSpace = np.random.choice(
-            self.action_space, size=1)
-
+    def _step(self, action):
         # Random step_counts
-        match next_step_count:
+        match action:
             case ActionSpace.UP:
                 self.y1 += -self.block
             case ActionSpace.DOWN:
@@ -146,10 +147,19 @@ class SnakeGame(tf_py_environment.TFPyEnvironment):
         self.clock.tick(20)
         return self.score, self.reward, self.game_over
 
+    def action_spec(self):
+        return self._action_spec
+
+    def observation_spec(self):
+        return self._obervation_spec
+
 
 snake_game = SnakeGame()
 snake_game.reset()
 snake_game.placeFood()
 
-for i in range(0, 100):
-    snake_game.playstep_count()
+pyenv = tf_py_environment.TFPyEnvironment(snake_game)
+
+
+# for i in range(0, 100):
+#     snake_game.playstep_count()
