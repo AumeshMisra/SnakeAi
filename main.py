@@ -3,6 +3,8 @@ from enum import Enum
 import numpy as np
 import random
 import tensorflow as tf
+from gym import Env
+from gym.spaces import Discrete, Box
 
 # from tf_agents.agents.dqn import dqn_agent
 # from tf_agents.drivers import py_driver
@@ -48,7 +50,7 @@ class ActionSpace(Enum):
     LEFT = 'left'
 
 
-class SnakeGame(py_environment.PyEnvironment):
+class SnakeGame(Env):
     def __init__(self):
         pygame.init()
         self.width: int = 400
@@ -62,25 +64,26 @@ class SnakeGame(py_environment.PyEnvironment):
         self.block = 10
         self.snake_body = []
         self.score = 0
-        self.step_count = 0
         self.reward = 0
         self.game_over = False
-        self._action_spec = array_spec.ArraySpec.from_array(np.array((ActionSpace.UP, ActionSpace.DOWN,
-                                                                      ActionSpace.RIGHT, ActionSpace.LEFT)), name='action')
+        self.action_space = Discrete(4)
+        self.observation_space = Box(low=np.array([-50]))
         self._obervation_spec = array_spec.BoundedArraySpec(
             shape=(4,), dtype=np.int32, name='observation')
 
-    def _reset(self):
+    def render(self):
         self.dis = pygame.display.set_mode((self.width, self.height))
         pygame.display.update()
         pygame.display.set_caption('Snake game by Aumesh')
 
-    def displayGameOver(self):
-        fontTitle = pygame.font.SysFont("arial", 24)
-        textTitle = fontTitle.render("Game Over", True, red)
-        rectTitle = textTitle.get_rect(center=self.dis.get_rect().center)
-        self.dis.blit(textTitle, rectTitle)
-        pygame.display.update()
+    def reset(self):
+        self.x1 = self.width/2
+        self.y1 = self.height/2
+        self.placeFood()
+        self.snake_body = []
+        self.score = 0
+        self.reward = 0
+        self.game_over = False
 
     def placeFood(self):
         self.food_x = round(random.randrange(
@@ -88,16 +91,16 @@ class SnakeGame(py_environment.PyEnvironment):
         self.food_y = round(random.randrange(
             0, self.height - self.block) / 10.0) * 10.0
 
-    def _step(self, action):
+    def _step(self, action: int):
         # Random step_counts
         match action:
-            case ActionSpace.UP:
+            case 0:
                 self.y1 += -self.block
-            case ActionSpace.DOWN:
+            case 1:
                 self.y1 += self.block
-            case ActionSpace.LEFT:
+            case 2:
                 self.x1 += -self.block
-            case ActionSpace.RIGHT:
+            case 3:
                 self.x1 += self.block
 
         # Checking for quit
@@ -109,7 +112,7 @@ class SnakeGame(py_environment.PyEnvironment):
         # Checks out of bounds
         if self.x1 <= 0 or self.x1 >= self.width or self.y1 <= 0 or self.y1 >= self.height:
             self.displayGameOver()
-            self.reward -= 20
+            self.reward -= 100
             self.game_over = True
             return self.score, self.reward, self.game_over
 
@@ -117,7 +120,7 @@ class SnakeGame(py_environment.PyEnvironment):
         for body_part in self.snake_body[:-1]:
             if body_part[0] == self.x1 and body_part[1] == self.y1:
                 self.displayGameOver()
-                self.reward -= 20
+                self.reward -= 100
                 self.game_over = True
                 return self.score, self.reward, self.game_over
 
@@ -143,22 +146,14 @@ class SnakeGame(py_environment.PyEnvironment):
             pygame.draw.rect(
                 self.dis, blue, [body_part[0], body_part[1], self.block, self.block])
 
+        info = {}
         pygame.display.update()
         self.clock.tick(20)
-        return self.score, self.reward, self.game_over
-
-    def action_spec(self):
-        return self._action_spec
-
-    def observation_spec(self):
-        return self._obervation_spec
+        return self.score, self.reward, self.game_over, info
 
 
-snake_game = SnakeGame()
-snake_game.reset()
-snake_game.placeFood()
-
-pyenv = tf_py_environment.TFPyEnvironment(snake_game)
+# snake_game = SnakeGame()
+# env = tf_py_environment.TFPyEnvironment(snake_game)
 
 
 # for i in range(0, 100):
