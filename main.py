@@ -43,91 +43,106 @@ num_eval_episodes = 10  # @param {type:"integer"}
 eval_interval = 1000  # @param {type:"integer"}
 
 
-class ActionSpace(Enum):
-    UP = 'up'
-    DOWN = 'down'
-    RIGHT = 'right'
-    LEFT = 'left'
+class Food:
+    food_x: int
+
+    def __init__(self):
+        self.food_x, self.food_y = self.placeFood()
+
+    def placeFood(self):
+        food_x = round(random.randrange(
+            0, self.width - self.block) / 10.0) * 10.0
+        food_y = round(random.randrange(
+            0, self.height - self.block) / 10.0) * 10.0
+        return (food_x, food_y)
 
 
-class SnakeGame(Env):
+class Snake:
+    x1: int
+    y1: int
+    snake_body: list
+
+    def __init__(self, width, height):
+        self.snake.x1 = width/2
+        self.snake.y1 = height/2
+        self.snake.snake_body = []
+
+
+class SnakeGame:
     def __init__(self):
         pygame.init()
         self.width: int = 400
         self.height: int = 400
-        self.x1 = self.width/2
-        self.y1 = self.height/2
+        self.snake = Snake(self.width, self.height)
+        self.food = Food()
+
         self.clock = pygame.time.Clock()
         self.dis = None
-        self.food_x = 0
-        self.food_y = 0
+
         self.block = 10
-        self.snake_body = []
         self.score = 0
         self.reward = 0
         self.game_over = False
-        self.action_space = Discrete(4)
-        self.observation_space = Box(low=np.array([-50]))
-        self._obervation_spec = array_spec.BoundedArraySpec(
-            shape=(4,), dtype=np.int32, name='observation')
-
-    def render(self):
         self.dis = pygame.display.set_mode((self.width, self.height))
-        pygame.display.update()
         pygame.display.set_caption('Snake game by Aumesh')
-
-    def reset(self):
-        self.x1 = self.width/2
-        self.y1 = self.height/2
-        self.placeFood()
-        self.snake_body = []
-        self.score = 0
-        self.reward = 0
-        self.game_over = False
-
-    def placeFood(self):
-        self.food_x = round(random.randrange(
-            0, self.width - self.block) / 10.0) * 10.0
-        self.food_y = round(random.randrange(
-            0, self.height - self.block) / 10.0) * 10.0
-
-    def _step(self, action: int):
-        # Random step_counts
-        match action:
-            case 0:
-                self.y1 += -self.block
-            case 1:
-                self.y1 += self.block
-            case 2:
-                self.x1 += -self.block
-            case 3:
-                self.x1 += self.block
-
-        # Checking for quit
+    
+    def view(self):
+         # Checking for quit
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.game_over = True
-                return self.score, self.reward, self.game_over
+                return
+            
+        # Draws food
+        self.dis.fill(white)
+        pygame.draw.rect(
+            self.dis, red, [self.food_x, self.food_y, self.block, self.block])
+
+        # Draws snake body
+        self.snake.snake_body.append([self.snake.x1, self.snake.y1])
+        if (len(self.snake.snake_body) > self.score+1):
+            del self.snake.snake_body[0]
+        for body_part in self.snake.snake_body:
+            pygame.draw.rect(
+                self.dis, blue, [body_part[0], body_part[1], self.block, self.block])
+        pygame.display.update()
+        return
+        
+    def evaluate(self):
+        return self.reward
+
+    def observe(self):
+        return 0
+    
+    def is_done(self) -> bool:
+        return self.game_over
+    
+    def action(self, action):
+        match action:
+            case 0:
+                self.snake.y1 += -self.block
+            case 1:
+                self.snake.y1 += self.block
+            case 2:
+                self.snake.x1 += -self.block
+            case 3:
+                self.snake.x1 += self.block
 
         # Checks out of bounds
-        if self.x1 <= 0 or self.x1 >= self.width or self.y1 <= 0 or self.y1 >= self.height:
-            self.displayGameOver()
+        if self.snake.x1 <= 0 or self.snake.x1 >= self.width or self.snake.y1 <= 0 or self.snake.y1 >= self.height:
             self.reward -= 100
             self.game_over = True
-            return self.score, self.reward, self.game_over
+            return
 
         # Checks for collision with itself
-        for body_part in self.snake_body[:-1]:
-            if body_part[0] == self.x1 and body_part[1] == self.y1:
-                self.displayGameOver()
+        for body_part in self.snake.snake_body[:-1]:
+            if body_part[0] == self.snake.x1 and body_part[1] == self.snake.y1:
                 self.reward -= 100
                 self.game_over = True
-                return self.score, self.reward, self.game_over
-
-        self.dis.fill(white)
+                return
 
         # Randomizes food palcement after being eaten
-        if (self.x1 == self.food_x and self.y1 == self.food_y):
+        if (self.snake.x1 == self.food_x and self.snake.y1 == self.food_y):
             self.food_x = round(random.randrange(
                 0, self.width - self.block) / 10.0) * 10.0
             self.food_y = round(random.randrange(
@@ -135,21 +150,33 @@ class SnakeGame(Env):
             self.score += 1
             self.reward += 10
 
-        pygame.draw.rect(
-            self.dis, red, [self.food_x, self.food_y, self.block, self.block])
-
-        # Draws snake body
-        self.snake_body.append([self.x1, self.y1])
-        if (len(self.snake_body) > self.score+1):
-            del self.snake_body[0]
-        for body_part in self.snake_body:
-            pygame.draw.rect(
-                self.dis, blue, [body_part[0], body_part[1], self.block, self.block])
-
-        info = {}
-        pygame.display.update()
         self.clock.tick(20)
-        return self.score, self.reward, self.game_over, info
+        return
+
+
+class Agent(Env):
+    def __init__(self):
+        self.snake_game = SnakeGame()
+        self.action_space = Discrete(4)
+        # we need to define observation space to be the list of states around our snake, food, and walls
+        # the observation space is what we observe with respect to the game
+        self.observation_space = Box(low=np.array([-50]))
+
+    def render(self):
+        self.snake_game.view()
+
+    def reset(self):
+        del self.snake_game()
+        self.snake_game = SnakeGame()
+        obs = self.snake_game.observe()
+        return obs
+
+    def step(self, action: int):
+        self.snake_game.action(action)
+        obs = self.snake_game.observe()
+        reward = self.snake_game.evaluate()
+        done = self.snake_game.is_done()
+        return obs, reward, done, {}        
 
 
 # snake_game = SnakeGame()
