@@ -50,11 +50,11 @@ class Food:
     def __init__(self):
         self.food_x, self.food_y = self.placeFood()
 
-    def placeFood(self):
+    def placeFood(self, width, height, block):
         food_x = round(random.randrange(
-            0, self.width - self.block) / 10.0) * 10.0
+            0, width - block) / 10.0) * 10.0
         food_y = round(random.randrange(
-            0, self.height - self.block) / 10.0) * 10.0
+            0, height - block) / 10.0) * 10.0
         return (food_x, food_y)
 
 
@@ -64,12 +64,10 @@ class Snake:
     snake_body: list
 
     def __init__(self, width, height):
-        self.snake.x1 = width/2
-        self.snake.y1 = height/2
-        self.snake.snake_body = []\
-    
-    def length(self):
-        return len(self.snake_body)
+        self.x1 = width/2
+        self.y1 = height/2
+        self.snake_body = []
+        self.direction = 0 # 0 is up, 1 is right, 2 is down, 3 is left
 
 
 class SnakeGame:
@@ -118,42 +116,52 @@ class SnakeGame:
     def observe(self):
         delta_food_x = self.food.food_x - self.snake.x1
         delta_food_y = self.food.food_y - self.snake.y1
-        obs = [self.snake.x1, self.snake.y1, delta_food_x, delta_food_y, self.snake.length]
+        delta_left_wall = self.snake.x1
+        delta_right_wall = self.width - self.snake.x1
+        delta_bottom = self.snake.y1
+        delta_top = self.height - self.snake.y1
+        up: int = self.snake.direction == 0
+        right: int = self.snake.direction == 1
+        down: int = self.snake.direction == 2
+        left: int = self.snake.direction == 3
+        obs = [self.snake.x1, self.snake.y1, delta_food_x, delta_food_y, self.score, delta_left_wall, delta_right_wall, delta_bottom, delta_top, up, right, down, left]
+        obs = np.array(obs)
         return obs
     
     def is_done(self) -> bool:
-        return self.game_over
-    
-    def action(self, action):
-        match action:
-            case 0:
-                self.snake.y1 += -self.block
-            case 1:
-                self.snake.y1 += self.block
-            case 2:
-                self.snake.x1 += -self.block
-            case 3:
-                self.snake.x1 += self.block
-
         # Checks out of bounds
         if self.snake.x1 <= 0 or self.snake.x1 >= self.width or self.snake.y1 <= 0 or self.snake.y1 >= self.height:
             self.reward -= 100
             self.game_over = True
-            return
+            return self.game_over
 
         # Checks for collision with itself
         for body_part in self.snake.snake_body[:-1]:
             if body_part[0] == self.snake.x1 and body_part[1] == self.snake.y1:
                 self.reward -= 100
                 self.game_over = True
-                return
+                return self.game_over
+
+        return self.game_over
+    
+    def action(self, action):
+        match action:
+            case 0:
+                self.snake.y1 += -self.block
+                self.snake.direction = 2
+            case 1:
+                self.snake.y1 += self.block
+                self.snake.direction = 0
+            case 2:
+                self.snake.x1 += -self.block
+                self.snake.direction = 3
+            case 3:
+                self.snake.x1 += self.block
+                self.snake.direction = 1
 
         # Randomizes food palcement after being eaten
         if (self.snake.x1 == self.food.food_x and self.snake.y1 == self.food.food_y):
-            self.food.food_x = round(random.randrange(
-                0, self.width - self.block) / 10.0) * 10.0
-            self.food.food_y = round(random.randrange(
-                0, self.height - self.block) / 10.0) * 10.0
+            self.food.food_x, self.food.food_y = self.food.placeFood(self.width, self.height, self.block)
             self.score += 1
             self.reward += 10
 
@@ -167,7 +175,7 @@ class Agent(Env):
         self.action_space = Discrete(4)
         # we need to define observation space to be the list of states around our snake, food, and walls
         # the observation space is what we observe with respect to the game
-        self.observation_space = Box(low=np.array([-50]))
+        self.observation_space = Box(low=-400, high=400, shape=(13,))
 
     def render(self):
         self.snake_game.view()
@@ -183,7 +191,7 @@ class Agent(Env):
         obs = self.snake_game.observe()
         reward = self.snake_game.evaluate()
         done = self.snake_game.is_done()
-        return obs, reward, done, {}     
+        return obs, reward, done, {}
 
 
 # snake_game = SnakeGame()
