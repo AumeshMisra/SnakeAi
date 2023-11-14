@@ -45,6 +45,7 @@ eval_interval = 1000  # @param {type:"integer"}
 
 class Food:
     food_x: int
+    food_y: int
 
     def __init__(self):
         self.food_x, self.food_y = self.placeFood()
@@ -65,7 +66,10 @@ class Snake:
     def __init__(self, width, height):
         self.snake.x1 = width/2
         self.snake.y1 = height/2
-        self.snake.snake_body = []
+        self.snake.snake_body = []\
+    
+    def length(self):
+        return len(self.snake_body)
 
 
 class SnakeGame:
@@ -96,7 +100,7 @@ class SnakeGame:
         # Draws food
         self.dis.fill(white)
         pygame.draw.rect(
-            self.dis, red, [self.food_x, self.food_y, self.block, self.block])
+            self.dis, red, [self.food.food_x, self.food.food_y, self.block, self.block])
 
         # Draws snake body
         self.snake.snake_body.append([self.snake.x1, self.snake.y1])
@@ -112,7 +116,10 @@ class SnakeGame:
         return self.reward
 
     def observe(self):
-        return 0
+        delta_food_x = self.food.food_x - self.snake.x1
+        delta_food_y = self.food.food_y - self.snake.y1
+        obs = [self.snake.x1, self.snake.y1, delta_food_x, delta_food_y, self.snake.length]
+        return obs
     
     def is_done(self) -> bool:
         return self.game_over
@@ -142,10 +149,10 @@ class SnakeGame:
                 return
 
         # Randomizes food palcement after being eaten
-        if (self.snake.x1 == self.food_x and self.snake.y1 == self.food_y):
-            self.food_x = round(random.randrange(
+        if (self.snake.x1 == self.food.food_x and self.snake.y1 == self.food.food_y):
+            self.food.food_x = round(random.randrange(
                 0, self.width - self.block) / 10.0) * 10.0
-            self.food_y = round(random.randrange(
+            self.food.food_y = round(random.randrange(
                 0, self.height - self.block) / 10.0) * 10.0
             self.score += 1
             self.reward += 10
@@ -176,7 +183,7 @@ class Agent(Env):
         obs = self.snake_game.observe()
         reward = self.snake_game.evaluate()
         done = self.snake_game.is_done()
-        return obs, reward, done, {}        
+        return obs, reward, done, {}     
 
 
 # snake_game = SnakeGame()
