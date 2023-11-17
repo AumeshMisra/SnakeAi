@@ -11,8 +11,8 @@ import random
 from gym import Env
 from gym.spaces import Discrete, Box
 from keras.models import Sequential
-from keras.layers import Dense, InputLayer
-from keras.optimizers import Adam
+from keras.layers import Dense, Flatten
+from keras.optimizers.legacy import Adam
 
 
 # Colors
@@ -44,7 +44,8 @@ class Snake:
     def __init__(self, width, height):
         self.x1 = width/2
         self.y1 = height/2
-        self.snake_body = []
+        self.snake_body = [[
+            self.x1-20, self.y1], [self.x1-10, self.y1]]
         self.direction = 0  # 0 is up, 1 is right, 2 is down, 3 is left
 
 
@@ -80,7 +81,8 @@ class SnakeGame:
 
         # Draws snake body
         self.snake.snake_body.append([self.snake.x1, self.snake.y1])
-        if (len(self.snake.snake_body) > self.score+1):
+        print(self.snake.snake_body, len(self.snake.snake_body))
+        if (len(self.snake.snake_body) > self.score+3):
             del self.snake.snake_body[0]
         for body_part in self.snake.snake_body:
             pygame.draw.rect(
@@ -145,7 +147,8 @@ class SnakeGame:
             self.score += 1
             self.reward += 10
 
-        self.clock.tick(20)
+        self.reward -= 1
+        self.clock.tick(5)
         return
 
 
@@ -169,51 +172,54 @@ class Agent(Env):
     def step(self, action: int):
         self.snake_game.action(action)
         obs = self.snake_game.observe()
-        reward = self.snake_game.evaluate()
         done = self.snake_game.is_done()
+        reward = self.snake_game.evaluate()
         return obs, reward, done, {}
 
 
 env = Agent()
 
 # testing episodes
-# episodes = 10
-# for episode in range(1, episodes):
-#     state = env.reset()
-#     done = False
-#     score = 0
+episodes = 10
+for episode in range(1, episodes):
+    state = env.reset()
+    done = False
+    score = 0
 
-#     while not done:
-#         env.render()
-#         action = env.action_space.sample()
-#         n_state, reward, done, info = env.step(action)
-#         score += reward
-#     print('Episode:{} Score:{}'.format(episode, score))
-
-
-def build_model(actions):
-    model = Sequential()
-    model.add(InputLayer(input_shape=(1, 13), name='Input Layer'))
-    model.add(Dense(24, activation='relu',
-              input_shape=(1, 13), name='Hidden Layer 1'))
-    model.add(Dense(actions, activation='relu', name='Hidden Layer 2'))
-    return model
+    while not done:
+        env.render()
+        action = env.action_space.sample()
+        n_state, reward, done, info = env.step(action)
+        score += reward
+    print('Episode:{} Score:{}'.format(episode, score))
 
 
-states = env.observation_space.shape
-actions = env.action_space.n
-print(actions)
-model = build_model(actions)
+# def build_model(actions):
+#     model = Sequential()
+#     # model.add(InputLayer(input_shape=(1, 13), name='input'))
+#     model.add(Dense(24, activation='relu',
+#               input_shape=(1, 13), name='hl1'))
+#     model.add(Dense(actions, activation='relu', name='hl2'))
+#     model.add(Dense(actions, activation='relu', name='hl3'))
+#     model.add(Flatten())
+#     # model.add(Dense(1, name='output'))
+#     print(model.summary())
+#     return model
 
 
-def build_agent(model, actions):
-    policy = BoltzmannQPolicy()
-    memory = SequentialMemory(limit=10000, window_length=1)
-    dqn = DQNAgent(model=model, memory=memory, policy=policy,
-                   nb_actions=actions, nb_steps_warmup=10, target_model_update=1e-2)
-    return dqn
+# states = env.observation_space.shape
+# actions = env.action_space.n
+# model = build_model(actions)
 
 
-dqn = build_agent(model, actions)
-dqn.compile(Adam(learning_rate=1e-3), metrics=['mae'])
-dqn.fit(env, nb_steps=10000, visualize=True, verbose=1)
+# def build_agent(model, actions):
+#     policy = BoltzmannQPolicy()
+#     memory = SequentialMemory(limit=10000, window_length=1)
+#     dqn = DQNAgent(model=model, memory=memory, policy=policy,
+#                    nb_actions=actions, nb_steps_warmup=10, target_model_update=1e-2)
+#     return dqn
+
+
+# dqn = build_agent(model, actions)
+# dqn.compile(Adam(learning_rate=1e-3), metrics=['mae'])
+# dqn.fit(env, nb_steps=10000, visualize=True, verbose=1)
