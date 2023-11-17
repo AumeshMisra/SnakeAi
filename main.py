@@ -46,7 +46,7 @@ class Snake:
         self.x1 = width/2
         self.y1 = height/2
         self.snake_body = [[
-            self.x1-20, self.y1], [self.x1-10, self.y1]]
+            self.x1-20, self.y1], [self.x1-10, self.y1], [self.x1, self.y1]]
         self.direction = 1  # 0 is up, 1 is right, 2 is down, 3 is left
 
 
@@ -81,9 +81,6 @@ class SnakeGame:
             self.dis, red, [self.food.food_x, self.food.food_y, self.block, self.block])
 
         # Draws snake body
-        self.snake.snake_body.append([self.snake.x1, self.snake.y1])
-        if (len(self.snake.snake_body) > self.score+3):
-            del self.snake.snake_body[0]
         for body_part in self.snake.snake_body:
             pygame.draw.rect(
                 self.dis, blue, [body_part[0], body_part[1], self.block, self.block])
@@ -96,34 +93,82 @@ class SnakeGame:
     def observe(self):
         delta_food_x = self.food.food_x - self.snake.x1
         delta_food_y = self.food.food_y - self.snake.y1
+        food_above = int(delta_food_y > 0)
+        food_below = int(delta_food_y < 0)
+        food_right = int(delta_food_x > 0)
+        food_left = int(delta_food_x < 0)
         delta_left_wall = self.snake.x1
         delta_right_wall = self.width - self.snake.x1
         delta_bottom = self.snake.y1
         delta_top = self.height - self.snake.y1
+
+        # checking body position:
+        # body close
+        body_up = []
+        body_right = []
+        body_down = []
+        body_left = []
+        if len(self.snake.snake_body) > 2:
+            for [x1, y1] in self.snake.snake_body[:-1]:
+                if math.sqrt((x1-self.snake.x1)**2 + (y1-self.snake.y1)**2) == 10:
+                    if y1 < self.snake.y1:
+                        body_down.append(1)
+                    elif y1 > self.snake.y1:
+                        body_up.append(1)
+                    if x1 < self.snake.x1:
+                        body_left.append(1)
+                    elif x1 > self.snake.x1:
+                        body_right.append(1)
+
+        if len(body_up) > 0:
+            body_up = 1
+        else:
+            body_up = 0
+        if len(body_right) > 0:
+            body_right = 1
+        else:
+            body_right = 0
+        if len(body_down) > 0:
+            body_down = 1
+        else:
+            body_down = 0
+        if len(body_left) > 0:
+            body_left = 1
+        else:
+            body_left = 0
+
+        print(body_up, body_right, body_down, body_left, math.sqrt(
+            (x1-self.snake.x1)**2 + (y1-self.snake.y1)**2))
+        print(self.snake.snake_body[:-1])
+
+        wall_left, wall_right, wall_up, wall_down = 0, 0, 0, 0
+
+        if delta_left_wall == -10:
+            wall_left = 1
+        if delta_right_wall == 10:
+            wall_right = 1
+        if delta_bottom == 10:
+            wall_down = 1
+        if delta_top == 10:
+            wall_up = 1
+
+        obstacle_left = int(wall_left or body_left)
+        obstacle_right = int(wall_right or body_right)
+        obstacle_up = int(wall_up or body_up)
+        obstacle_down = int(wall_down or body_down)
+
         up: int = int(self.snake.direction == 0)
         right: int = int(self.snake.direction == 1)
         down: int = int(self.snake.direction == 2)
         left: int = int(self.snake.direction == 3)
-        obs = [self.snake.x1, self.snake.y1, delta_food_x, delta_food_y, self.score,
-               delta_left_wall, delta_right_wall, delta_bottom, delta_top, up, right, down, left,
+        # print(up, right, down, left)
+        obs = [self.snake.x1, self.snake.y1, food_above, food_below, food_left, food_right, self.score,
+               delta_left_wall, delta_right_wall, obstacle_up, obstacle_right, obstacle_down, obstacle_left, up, right, down, left,
                self.food.food_x, self.food.food_y]
         obs = np.array(obs)
         return obs
 
     def is_done(self) -> bool:
-        # Checks out of bounds
-        if self.snake.x1 <= 0 or self.snake.x1 >= self.width or self.snake.y1 <= 0 or self.snake.y1 >= self.height:
-            self.reward -= 100
-            self.game_over = True
-            return self.game_over
-
-        # Checks for collision with itself
-        for body_part in self.snake.snake_body[:-1]:
-            if body_part[0] == self.snake.x1 and body_part[1] == self.snake.y1:
-                self.reward -= 100
-                self.game_over = True
-                return self.game_over
-
         return self.game_over
 
     def action(self, action):
@@ -158,6 +203,10 @@ class SnakeGame:
         elif (newDistance > oldDistance):
             self.reward -= 1
 
+        self.snake.snake_body.append([self.snake.x1, self.snake.y1])
+        if (len(self.snake.snake_body) > self.score+3):
+            del self.snake.snake_body[0]
+
         # Randomizes food palcement after being eaten
         if (self.snake.x1 == self.food.food_x and self.snake.y1 == self.food.food_y):
             self.food.food_x, self.food.food_y = self.food.placeFood(
@@ -165,7 +214,18 @@ class SnakeGame:
             self.score += 1
             self.reward += 10
 
-        self.clock.tick(100)
+        # Checks out of bounds
+        if self.snake.x1 <= 0 or self.snake.x1 >= self.width or self.snake.y1 <= 0 or self.snake.y1 >= self.height:
+            self.reward -= 100
+            self.game_over = True
+
+        # Checks for collision with itself
+        for body_part in self.snake.snake_body[:-1]:
+            if body_part[0] == self.snake.x1 and body_part[1] == self.snake.y1:
+                self.reward -= 100
+                self.game_over = True
+
+        self.clock.tick(0.5)
         return
 
 
@@ -189,33 +249,32 @@ class Agent(Env):
     def step(self, action: int):
         self.snake_game.action(action)
         obs = self.snake_game.observe()
-        done = self.snake_game.is_done()
         reward = self.snake_game.evaluate()
+        done = self.snake_game.is_done()
         return obs, reward, done, {}
 
 
 env = Agent()
 
 # testing episodes
-# episodes = 10
-# for episode in range(1, episodes):
-#     state = env.reset()
-#     done = False
-#     score = 0
+episodes = 10
+for episode in range(1, episodes):
+    state = env.reset()
+    done = False
+    score = 0
 
-#     while not done:
-#         env.render()
-#         action = env.action_space.sample()
-#         n_state, reward, done, info = env.step(action)
-#         score += reward
-#     print('Episode:{} Score:{}'.format(episode, score))
+    while not done:
+        env.render()
+        action = env.action_space.sample()
+        n_state, reward, done, info = env.step(action)
+        score += reward
+    print('Episode:{} Score:{}'.format(episode, score))
 
 
 def build_model(actions):
     model = Sequential()
-    # model.add(InputLayer(input_shape=(1, 13), name='input'))
     model.add(Dense(128, activation='relu',
-              input_shape=(1, 15), name='hl1'))
+              input_shape=(1, 19), name='hl1'))
     model.add(Dense(128, activation='relu', name='hl2'))
     model.add(Dense(128, activation='relu', name='hl3'))
     model.add(Dense(actions, activation='softmax', name='hl4'))
@@ -237,18 +296,19 @@ def build_agent(model, actions):
     return dqn
 
 
-# json_file = open('./model/model.json', 'r')
-# loaded_model_json = json_file.read()
-# json_file.close()
-# loaded_model = model_from_json(loaded_model_json)
-dqn = build_agent(model, actions)
-# dqn.model.load_weights('./weights/weights.h5')
-# dqn.model.load('./weights/weights.keras')
-# print(dqn)
-dqn.compile(Adam(learning_rate=1e-3), metrics=['mse'])
-dqn.fit(env, nb_steps=10000, visualize=True, verbose=1)
+# # json_file = open('./model/model.json', 'r')
+# # loaded_model_json = json_file.read()
+# # json_file.close()
+# # loaded_model = model_from_json(loaded_model_json)
+# dqn = build_agent(model, actions)
+# dqn.gamma = 0.95
+# # dqn.model.load_weights('./weights/weights.h5')
+# # dqn.model.load('./weights/weights.keras')
+# # print(dqn)
+# dqn.compile(Adam(learning_rate=0.00025), metrics=['mse'])
+# dqn.fit(env, nb_steps=10000, visualize=True, verbose=1)
 
-model_json = dqn.model.to_json()
-with open("./model/model.json", "w") as json_file:
-    json_file.write(model_json)
-dqn.model.save_weights('./weights/weights.h5', overwrite=True)
+# model_json = dqn.model.to_json()
+# with open("./model/model.json", "w") as json_file:
+#     json_file.write(model_json)
+# dqn.model.save_weights('./weights/weights.h5', overwrite=True)
