@@ -2,6 +2,7 @@
 # import tensorflow  # nopep8
 # tensorflow.keras.__version__ = __version__  # nopep8
 
+import math
 from rl.agents import DQNAgent
 from rl.policy import BoltzmannQPolicy
 from rl.memory import SequentialMemory
@@ -10,7 +11,7 @@ import numpy as np
 import random
 from gym import Env
 from gym.spaces import Discrete, Box
-from keras.models import Sequential
+from keras.models import Sequential, model_from_json
 from keras.layers import Dense, Flatten
 from keras.optimizers.legacy import Adam
 
@@ -46,14 +47,14 @@ class Snake:
         self.y1 = height/2
         self.snake_body = [[
             self.x1-20, self.y1], [self.x1-10, self.y1]]
-        self.direction = 0  # 0 is up, 1 is right, 2 is down, 3 is left
+        self.direction = 1  # 0 is up, 1 is right, 2 is down, 3 is left
 
 
 class SnakeGame:
     def __init__(self):
         pygame.init()
-        self.width: int = 400
-        self.height: int = 400
+        self.width: int = 200
+        self.height: int = 200
         self.block = 10
         self.snake = Snake(self.width, self.height)
         self.food = Food(self.width, self.height, self.block)
@@ -81,7 +82,6 @@ class SnakeGame:
 
         # Draws snake body
         self.snake.snake_body.append([self.snake.x1, self.snake.y1])
-        print(self.snake.snake_body, len(self.snake.snake_body))
         if (len(self.snake.snake_body) > self.score+3):
             del self.snake.snake_body[0]
         for body_part in self.snake.snake_body:
@@ -100,12 +100,13 @@ class SnakeGame:
         delta_right_wall = self.width - self.snake.x1
         delta_bottom = self.snake.y1
         delta_top = self.height - self.snake.y1
-        up: int = self.snake.direction == 0
-        right: int = self.snake.direction == 1
-        down: int = self.snake.direction == 2
-        left: int = self.snake.direction == 3
+        up: int = int(self.snake.direction == 0)
+        right: int = int(self.snake.direction == 1)
+        down: int = int(self.snake.direction == 2)
+        left: int = int(self.snake.direction == 3)
         obs = [self.snake.x1, self.snake.y1, delta_food_x, delta_food_y, self.score,
-               delta_left_wall, delta_right_wall, delta_bottom, delta_top, up, right, down, left]
+               delta_left_wall, delta_right_wall, delta_bottom, delta_top, up, right, down, left,
+               self.food.food_x, self.food.food_y]
         obs = np.array(obs)
         return obs
 
@@ -126,19 +127,36 @@ class SnakeGame:
         return self.game_over
 
     def action(self, action):
+        delta_y_before = 0
+        delta_x_before = 0
         match action:
             case 0:
+                delta_y_before += self.block
                 self.snake.y1 += -self.block
                 self.snake.direction = 2
             case 1:
+                delta_y_before -= self.block
                 self.snake.y1 += self.block
                 self.snake.direction = 0
             case 2:
+                delta_x_before += self.block
                 self.snake.x1 += -self.block
                 self.snake.direction = 3
             case 3:
+                delta_x_before -= self.block
                 self.snake.x1 += self.block
                 self.snake.direction = 1
+
+        oldDistance = math.sqrt((self.snake.x1 + delta_x_before - self.food.food_x)
+                                ** 2 + (self.snake.y1 + delta_y_before - self.food.food_y)**2)
+
+        newDistance = math.sqrt((self.snake.x1 - self.food.food_x)
+                                ** 2 + (self.snake.y1 - self.food.food_y)**2)
+
+        if (oldDistance > newDistance):
+            self.reward += 1
+        elif (newDistance > oldDistance):
+            self.reward -= 1
 
         # Randomizes food palcement after being eaten
         if (self.snake.x1 == self.food.food_x and self.snake.y1 == self.food.food_y):
@@ -147,8 +165,7 @@ class SnakeGame:
             self.score += 1
             self.reward += 10
 
-        self.reward -= 1
-        self.clock.tick(5)
+        self.clock.tick(100)
         return
 
 
@@ -180,46 +197,58 @@ class Agent(Env):
 env = Agent()
 
 # testing episodes
-episodes = 10
-for episode in range(1, episodes):
-    state = env.reset()
-    done = False
-    score = 0
+# episodes = 10
+# for episode in range(1, episodes):
+#     state = env.reset()
+#     done = False
+#     score = 0
 
-    while not done:
-        env.render()
-        action = env.action_space.sample()
-        n_state, reward, done, info = env.step(action)
-        score += reward
-    print('Episode:{} Score:{}'.format(episode, score))
-
-
-# def build_model(actions):
-#     model = Sequential()
-#     # model.add(InputLayer(input_shape=(1, 13), name='input'))
-#     model.add(Dense(24, activation='relu',
-#               input_shape=(1, 13), name='hl1'))
-#     model.add(Dense(actions, activation='relu', name='hl2'))
-#     model.add(Dense(actions, activation='relu', name='hl3'))
-#     model.add(Flatten())
-#     # model.add(Dense(1, name='output'))
-#     print(model.summary())
-#     return model
+#     while not done:
+#         env.render()
+#         action = env.action_space.sample()
+#         n_state, reward, done, info = env.step(action)
+#         score += reward
+#     print('Episode:{} Score:{}'.format(episode, score))
 
 
-# states = env.observation_space.shape
-# actions = env.action_space.n
-# model = build_model(actions)
+def build_model(actions):
+    model = Sequential()
+    # model.add(InputLayer(input_shape=(1, 13), name='input'))
+    model.add(Dense(128, activation='relu',
+              input_shape=(1, 15), name='hl1'))
+    model.add(Dense(128, activation='relu', name='hl2'))
+    model.add(Dense(128, activation='relu', name='hl3'))
+    model.add(Dense(actions, activation='softmax', name='hl4'))
+    model.add(Flatten())
+    print(model.summary())
+    return model
 
 
-# def build_agent(model, actions):
-#     policy = BoltzmannQPolicy()
-#     memory = SequentialMemory(limit=10000, window_length=1)
-#     dqn = DQNAgent(model=model, memory=memory, policy=policy,
-#                    nb_actions=actions, nb_steps_warmup=10, target_model_update=1e-2)
-#     return dqn
+states = env.observation_space.shape
+actions = env.action_space.n
+model = build_model(actions)
 
 
-# dqn = build_agent(model, actions)
-# dqn.compile(Adam(learning_rate=1e-3), metrics=['mae'])
-# dqn.fit(env, nb_steps=10000, visualize=True, verbose=1)
+def build_agent(model, actions):
+    policy = BoltzmannQPolicy()
+    memory = SequentialMemory(limit=10000, window_length=1)
+    dqn = DQNAgent(model=model, memory=memory, policy=policy,
+                   nb_actions=actions, nb_steps_warmup=10, gamma=0.95, batch_size=500, target_model_update=1e-2)
+    return dqn
+
+
+# json_file = open('./model/model.json', 'r')
+# loaded_model_json = json_file.read()
+# json_file.close()
+# loaded_model = model_from_json(loaded_model_json)
+dqn = build_agent(model, actions)
+# dqn.model.load_weights('./weights/weights.h5')
+# dqn.model.load('./weights/weights.keras')
+# print(dqn)
+dqn.compile(Adam(learning_rate=1e-3), metrics=['mse'])
+dqn.fit(env, nb_steps=10000, visualize=True, verbose=1)
+
+model_json = dqn.model.to_json()
+with open("./model/model.json", "w") as json_file:
+    json_file.write(model_json)
+dqn.model.save_weights('./weights/weights.h5', overwrite=True)
