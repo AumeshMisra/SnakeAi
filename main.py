@@ -92,15 +92,15 @@ class SnakeGame:
 
     def observe(self):
         delta_food_x = self.food.food_x - self.snake.x1
-        delta_food_y = self.food.food_y - self.snake.y1
+        delta_food_y = self.snake.y1 - self.food.food_y
         food_above = int(delta_food_y > 0)
         food_below = int(delta_food_y < 0)
         food_right = int(delta_food_x > 0)
         food_left = int(delta_food_x < 0)
         delta_left_wall = self.snake.x1
         delta_right_wall = self.width - self.snake.x1
-        delta_bottom = self.snake.y1
-        delta_top = self.height - self.snake.y1
+        delta_bottom = self.height - self.snake.y1
+        delta_top = self.snake.y1
 
         # checking body position:
         # body close
@@ -111,9 +111,9 @@ class SnakeGame:
         if len(self.snake.snake_body) > 2:
             for [x1, y1] in self.snake.snake_body[:-1]:
                 if math.sqrt((x1-self.snake.x1)**2 + (y1-self.snake.y1)**2) == 10:
-                    if y1 < self.snake.y1:
+                    if y1 > self.snake.y1:
                         body_down.append(1)
-                    elif y1 > self.snake.y1:
+                    elif y1 < self.snake.y1:
                         body_up.append(1)
                     if x1 < self.snake.x1:
                         body_left.append(1)
@@ -137,10 +137,6 @@ class SnakeGame:
         else:
             body_left = 0
 
-        print(body_up, body_right, body_down, body_left, math.sqrt(
-            (x1-self.snake.x1)**2 + (y1-self.snake.y1)**2))
-        print(self.snake.snake_body[:-1])
-
         wall_left, wall_right, wall_up, wall_down = 0, 0, 0, 0
 
         if delta_left_wall == -10:
@@ -161,7 +157,6 @@ class SnakeGame:
         right: int = int(self.snake.direction == 1)
         down: int = int(self.snake.direction == 2)
         left: int = int(self.snake.direction == 3)
-        # print(up, right, down, left)
         obs = [self.snake.x1, self.snake.y1, food_above, food_below, food_left, food_right, self.score,
                delta_left_wall, delta_right_wall, obstacle_up, obstacle_right, obstacle_down, obstacle_left, up, right, down, left,
                self.food.food_x, self.food.food_y]
@@ -225,7 +220,7 @@ class SnakeGame:
                 self.reward -= 100
                 self.game_over = True
 
-        self.clock.tick(0.5)
+        self.clock.tick(100)
         return
 
 
@@ -257,18 +252,18 @@ class Agent(Env):
 env = Agent()
 
 # testing episodes
-episodes = 10
-for episode in range(1, episodes):
-    state = env.reset()
-    done = False
-    score = 0
+# episodes = 10
+# for episode in range(1, episodes):
+#     state = env.reset()
+#     done = False
+#     score = 0
 
-    while not done:
-        env.render()
-        action = env.action_space.sample()
-        n_state, reward, done, info = env.step(action)
-        score += reward
-    print('Episode:{} Score:{}'.format(episode, score))
+#     while not done:
+#         env.render()
+#         action = env.action_space.sample()
+#         n_state, reward, done, info = env.step(action)
+#         score += reward
+#     print('Episode:{} Score:{}'.format(episode, score))
 
 
 def build_model(actions):
@@ -296,19 +291,19 @@ def build_agent(model, actions):
     return dqn
 
 
-# # json_file = open('./model/model.json', 'r')
-# # loaded_model_json = json_file.read()
-# # json_file.close()
-# # loaded_model = model_from_json(loaded_model_json)
-# dqn = build_agent(model, actions)
-# dqn.gamma = 0.95
-# # dqn.model.load_weights('./weights/weights.h5')
-# # dqn.model.load('./weights/weights.keras')
-# # print(dqn)
-# dqn.compile(Adam(learning_rate=0.00025), metrics=['mse'])
-# dqn.fit(env, nb_steps=10000, visualize=True, verbose=1)
+json_file = open('./model/model.json', 'r')
+loaded_model_json = json_file.read()
+json_file.close()
+loaded_model = model_from_json(loaded_model_json)
+dqn = build_agent(loaded_model, actions)
+dqn.gamma = 0.95
+dqn.model.load_weights('./weights/weights_100000.h5')
+# dqn.model.load('./weights/weights.keras')
+# print(dqn)
+dqn.compile(Adam(learning_rate=0.00025), metrics=['mse'])
+dqn.fit(env, nb_steps=10000, visualize=True, verbose=1)
 
-# model_json = dqn.model.to_json()
-# with open("./model/model.json", "w") as json_file:
-#     json_file.write(model_json)
-# dqn.model.save_weights('./weights/weights.h5', overwrite=True)
+model_json = dqn.model.to_json()
+with open("./model/model.json", "w") as json_file:
+    json_file.write(model_json)
+dqn.model.save_weights('./weights/weights_test.h5', overwrite=True)
