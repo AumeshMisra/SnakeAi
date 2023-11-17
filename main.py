@@ -1,54 +1,32 @@
+# from keras import __version__  # nopep8
+# import tensorflow  # nopep8
+# tensorflow.keras.__version__ = __version__  # nopep8
+
+from rl.agents import DQNAgent
+from rl.policy import BoltzmannQPolicy
+from rl.memory import SequentialMemory
 import pygame
-from enum import Enum
 import numpy as np
 import random
-import tensorflow as tf
 from gym import Env
 from gym.spaces import Discrete, Box
+from keras.models import Sequential
+from keras.layers import Dense, InputLayer
+from keras.optimizers import Adam
 
-# from tf_agents.agents.dqn import dqn_agent
-# from tf_agents.drivers import py_driver
-# from tf_agents.environments import suite_gym
-from tf_agents.environments import tf_py_environment, py_environment
-from tf_agents.typing import types
-from tf_agents.specs import array_spec
-# from tf_agents.eval import metric_utils
-# from tf_agents.metrics import tf_metrics
-# from tf_agents.networks import sequential
-# from tf_agents.policies import py_tf_eager_policy
-# from tf_agents.policies import random_tf_policy
-# from tf_agents.replay_buffers import reverb_replay_buffer
-# from tf_agents.replay_buffers import reverb_utils
-# from tf_agents.trajectories import trajectory
-# from tf_agents.specs import tensor_spec
-# from tf_agents.utils import common
 
 # Colors
 blue = (0, 0, 255)
 red = (255, 0, 0)
 white = (255, 255, 255)
 
-# hyperparameters (copied from https://www.tensorflow.org/agents/tutorials/1_dqn_tutorial)
-num_iterations = 20000  # @param {type:"integer"}
-
-initial_collect_step_counts = 100  # @param {type:"integer"}
-collect_step_counts_per_iteration = 1  # @param {type:"integer"}
-replay_buffer_max_length = 100000  # @param {type:"integer"}
-
-batch_size = 64  # @param {type:"integer"}
-learning_rate = 1e-3  # @param {type:"number"}
-log_interval = 200  # @param {type:"integer"}
-
-num_eval_episodes = 10  # @param {type:"integer"}
-eval_interval = 1000  # @param {type:"integer"}
-
 
 class Food:
     food_x: int
     food_y: int
 
-    def __init__(self):
-        self.food_x, self.food_y = self.placeFood()
+    def __init__(self, width, height, block):
+        self.food_x, self.food_y = self.placeFood(width, height, block)
 
     def placeFood(self, width, height, block):
         food_x = round(random.randrange(
@@ -67,7 +45,7 @@ class Snake:
         self.x1 = width/2
         self.y1 = height/2
         self.snake_body = []
-        self.direction = 0 # 0 is up, 1 is right, 2 is down, 3 is left
+        self.direction = 0  # 0 is up, 1 is right, 2 is down, 3 is left
 
 
 class SnakeGame:
@@ -75,26 +53,26 @@ class SnakeGame:
         pygame.init()
         self.width: int = 400
         self.height: int = 400
+        self.block = 10
         self.snake = Snake(self.width, self.height)
-        self.food = Food()
+        self.food = Food(self.width, self.height, self.block)
 
         self.clock = pygame.time.Clock()
         self.dis = None
 
-        self.block = 10
         self.score = 0
         self.reward = 0
         self.game_over = False
         self.dis = pygame.display.set_mode((self.width, self.height))
         pygame.display.set_caption('Snake game by Aumesh')
-    
+
     def view(self):
-         # Checking for quit
+        # Checking for quit
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.game_over = True
                 return
-            
+
         # Draws food
         self.dis.fill(white)
         pygame.draw.rect(
@@ -109,7 +87,7 @@ class SnakeGame:
                 self.dis, blue, [body_part[0], body_part[1], self.block, self.block])
         pygame.display.update()
         return
-        
+
     def evaluate(self):
         return self.reward
 
@@ -124,10 +102,11 @@ class SnakeGame:
         right: int = self.snake.direction == 1
         down: int = self.snake.direction == 2
         left: int = self.snake.direction == 3
-        obs = [self.snake.x1, self.snake.y1, delta_food_x, delta_food_y, self.score, delta_left_wall, delta_right_wall, delta_bottom, delta_top, up, right, down, left]
+        obs = [self.snake.x1, self.snake.y1, delta_food_x, delta_food_y, self.score,
+               delta_left_wall, delta_right_wall, delta_bottom, delta_top, up, right, down, left]
         obs = np.array(obs)
         return obs
-    
+
     def is_done(self) -> bool:
         # Checks out of bounds
         if self.snake.x1 <= 0 or self.snake.x1 >= self.width or self.snake.y1 <= 0 or self.snake.y1 >= self.height:
@@ -143,7 +122,7 @@ class SnakeGame:
                 return self.game_over
 
         return self.game_over
-    
+
     def action(self, action):
         match action:
             case 0:
@@ -161,7 +140,8 @@ class SnakeGame:
 
         # Randomizes food palcement after being eaten
         if (self.snake.x1 == self.food.food_x and self.snake.y1 == self.food.food_y):
-            self.food.food_x, self.food.food_y = self.food.placeFood(self.width, self.height, self.block)
+            self.food.food_x, self.food.food_y = self.food.placeFood(
+                self.width, self.height, self.block)
             self.score += 1
             self.reward += 10
 
@@ -181,7 +161,7 @@ class Agent(Env):
         self.snake_game.view()
 
     def reset(self):
-        del self.snake_game()
+        del self.snake_game
         self.snake_game = SnakeGame()
         obs = self.snake_game.observe()
         return obs
@@ -194,9 +174,46 @@ class Agent(Env):
         return obs, reward, done, {}
 
 
-# snake_game = SnakeGame()
-# env = tf_py_environment.TFPyEnvironment(snake_game)
+env = Agent()
+
+# testing episodes
+# episodes = 10
+# for episode in range(1, episodes):
+#     state = env.reset()
+#     done = False
+#     score = 0
+
+#     while not done:
+#         env.render()
+#         action = env.action_space.sample()
+#         n_state, reward, done, info = env.step(action)
+#         score += reward
+#     print('Episode:{} Score:{}'.format(episode, score))
 
 
-# for i in range(0, 100):
-#     snake_game.playstep_count()
+def build_model(actions):
+    model = Sequential()
+    model.add(InputLayer(input_shape=(1, 13), name='Input Layer'))
+    model.add(Dense(24, activation='relu',
+              input_shape=(1, 13), name='Hidden Layer 1'))
+    model.add(Dense(actions, activation='relu', name='Hidden Layer 2'))
+    return model
+
+
+states = env.observation_space.shape
+actions = env.action_space.n
+print(actions)
+model = build_model(actions)
+
+
+def build_agent(model, actions):
+    policy = BoltzmannQPolicy()
+    memory = SequentialMemory(limit=10000, window_length=1)
+    dqn = DQNAgent(model=model, memory=memory, policy=policy,
+                   nb_actions=actions, nb_steps_warmup=10, target_model_update=1e-2)
+    return dqn
+
+
+dqn = build_agent(model, actions)
+dqn.compile(Adam(learning_rate=1e-3), metrics=['mae'])
+dqn.fit(env, nb_steps=10000, visualize=True, verbose=1)
