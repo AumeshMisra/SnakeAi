@@ -109,7 +109,7 @@ class SnakeGame:
         body_down = []
         body_left = []
         if len(self.snake.snake_body) > 2:
-            for [x1, y1] in self.snake.snake_body[:-1]:
+            for [x1, y1] in self.snake.snake_body[:-3]:
                 if math.sqrt((x1-self.snake.x1)**2 + (y1-self.snake.y1)**2) == 10:
                     if y1 > self.snake.y1:
                         body_down.append(1)
@@ -166,36 +166,48 @@ class SnakeGame:
     def is_done(self) -> bool:
         return self.game_over
 
-    def action(self, action):
-        delta_y_before = 0
-        delta_x_before = 0
+    def makeMove(self, action):
         match action:
             case 0:
-                delta_y_before += self.block
-                self.snake.y1 += -self.block
-                self.snake.direction = 2
+                if (self.snake.direction != 2):
+                    self.snake.direction = 0
             case 1:
-                delta_y_before -= self.block
-                self.snake.y1 += self.block
-                self.snake.direction = 0
+                if (self.snake.direction != 3):
+                    self.snake.direction = 1
             case 2:
-                delta_x_before += self.block
-                self.snake.x1 += -self.block
-                self.snake.direction = 3
+                if (self.snake.direction != 0):
+                    self.snake.direction = 2
             case 3:
-                delta_x_before -= self.block
+                if (self.snake.direction != 1):
+                    self.snake.direction = 3
+
+    def action(self, action):
+        y_before = self.snake.x1
+        x_before = self.snake.y1
+        self.makeMove(action)
+        match self.snake.direction:
+            case 0:
+                self.snake.y1 += -self.block
+                self.snake.direction = 0
+            case 1:
                 self.snake.x1 += self.block
                 self.snake.direction = 1
+            case 2:
+                self.snake.y1 += self.block
+                self.snake.direction = 2
+            case 3:
+                self.snake.x1 += -self.block
+                self.snake.direction = 3
 
-        oldDistance = math.sqrt((self.snake.x1 + delta_x_before - self.food.food_x)
-                                ** 2 + (self.snake.y1 + delta_y_before - self.food.food_y)**2)
+        oldDistance = math.sqrt((x_before - self.food.food_x)
+                                ** 2 + (y_before - self.food.food_y)**2)
 
         newDistance = math.sqrt((self.snake.x1 - self.food.food_x)
                                 ** 2 + (self.snake.y1 - self.food.food_y)**2)
 
         if (oldDistance > newDistance):
             self.reward += 1
-        elif (newDistance > oldDistance):
+        else:
             self.reward -= 1
 
         self.snake.snake_body.append([self.snake.x1, self.snake.y1])
@@ -220,7 +232,7 @@ class SnakeGame:
                 self.reward -= 100
                 self.game_over = True
 
-        self.clock.tick(100)
+        # self.clock.tick(100)
         return
 
 
@@ -263,6 +275,8 @@ env = Agent()
 #         action = env.action_space.sample()
 #         n_state, reward, done, info = env.step(action)
 #         score += reward
+#         # print(env.snake_game.snake.direction)
+#         # print(n_state)
 #     print('Episode:{} Score:{}'.format(episode, score))
 
 
@@ -272,22 +286,23 @@ def build_model(actions):
               input_shape=(1, 19), name='hl1'))
     model.add(Dense(128, activation='relu', name='hl2'))
     model.add(Dense(128, activation='relu', name='hl3'))
-    model.add(Dense(actions, activation='softmax', name='hl4'))
     model.add(Flatten())
-    print(model.summary())
+    model.add(Dense(actions, activation='softmax', name='hl4'))
     return model
 
 
 states = env.observation_space.shape
 actions = env.action_space.n
 model = build_model(actions)
+# print(model.summary())
 
 
 def build_agent(model, actions):
     policy = BoltzmannQPolicy()
-    memory = SequentialMemory(limit=10000, window_length=1)
+    memory = SequentialMemory(limit=2500, window_length=1)
     dqn = DQNAgent(model=model, memory=memory, policy=policy,
-                   nb_actions=actions, nb_steps_warmup=10, gamma=0.95, batch_size=500, target_model_update=1e-2)
+                   nb_actions=actions, nb_steps_warmup=100, gamma=0.95, batch_size=500)
+    # dqn.model.epsilon =
     return dqn
 
 
@@ -296,14 +311,13 @@ loaded_model_json = json_file.read()
 json_file.close()
 loaded_model = model_from_json(loaded_model_json)
 dqn = build_agent(loaded_model, actions)
-dqn.gamma = 0.95
-dqn.model.load_weights('./weights/weights_100000.h5')
-# dqn.model.load('./weights/weights.keras')
-# print(dqn)
+dqn.model.load_weights('./weights/weights_3.h5')
+# # dqn.model.load('./weights/weights.keras')
+# # print(dqn)
 dqn.compile(Adam(learning_rate=0.00025), metrics=['mse'])
-dqn.fit(env, nb_steps=10000, visualize=True, verbose=1)
+dqn.fit(env, nb_steps=100000, visualize=False, verbose=1)
 
 model_json = dqn.model.to_json()
 with open("./model/model.json", "w") as json_file:
     json_file.write(model_json)
-dqn.model.save_weights('./weights/weights_test.h5', overwrite=True)
+dqn.model.save_weights('./weights/weights_4.h5', overwrite=True)
