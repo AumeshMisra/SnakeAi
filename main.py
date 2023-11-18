@@ -277,8 +277,8 @@ for episode in range(1, episodes):
 
     while not done:
         env.render()
-        action, _state = model.predict(obs, deterministic=True)
-        # action = env.action_space.sample()
+        # action, _state = model.predict(obs, deterministic=True)
+        action = env.action_space.sample()
         obs, reward, done, info = env.step(action)
         score += reward
         # print(env.snake_game.snake.direction)
