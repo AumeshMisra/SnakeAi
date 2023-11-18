@@ -17,14 +17,12 @@ class Food:
     food_x: int
     food_y: int
 
-    def __init__(self, width, height, block):
-        self.food_x, self.food_y = self.placeFood(width, height, block)
+    def __init__(self, width, height):
+        self.food_x, self.food_y = self.placeFood(width, height)
 
-    def placeFood(self, width, height, block):
-        food_x = round(random.randrange(
-            0, width - block) / 10.0) * 10.0
-        food_y = round(random.randrange(
-            0, height - block) / 10.0) * 10.0
+    def placeFood(self, width, height):
+        food_x = random.randrange(1, (width // 10)) * 10
+        food_y = random.randrange(1, (height // 10)) * 10
         return (food_x, food_y)
 
 
@@ -44,11 +42,11 @@ class Snake:
 class SnakeGame:
     def __init__(self):
         pygame.init()
-        self.width: int = 400
-        self.height: int = 400
+        self.width: int = 200
+        self.height: int = 200
         self.block = 10
         self.snake = Snake(self.width, self.height)
-        self.food = Food(self.width, self.height, self.block)
+        self.food = Food(self.width, self.height)
 
         self.clock = pygame.time.Clock()
         self.dis = None
@@ -161,15 +159,23 @@ class SnakeGame:
             case 0:
                 if (self.snake.direction != 2):
                     self.snake.direction = 0
+                else:
+                    self.reward = -10
             case 1:
                 if (self.snake.direction != 3):
                     self.snake.direction = 1
+                else:
+                    self.reward -= -10
             case 2:
                 if (self.snake.direction != 0):
                     self.snake.direction = 2
+                else:
+                    self.reward -= -10
             case 3:
                 if (self.snake.direction != 1):
                     self.snake.direction = 3
+                else:
+                    self.reward -= -10
 
     def action(self, action):
         x_before = self.snake.x1
@@ -196,10 +202,10 @@ class SnakeGame:
         newDistance = math.sqrt((self.snake.x1 - self.food.food_x)
                                 ** 2 + (self.snake.y1 - self.food.food_y)**2)
 
-        if (oldDistance > newDistance):
+        if (newDistance < oldDistance):  # if we get closer to food increase reward
             self.reward += 1
         else:
-            self.reward -= 1
+            self.reward -= -1
 
         self.snake.snake_body.append([self.snake.x1, self.snake.y1])
         if (len(self.snake.snake_body) > self.score+3):
@@ -208,12 +214,14 @@ class SnakeGame:
         # Randomizes food palcement after being eaten
         if (self.snake.x1 == self.food.food_x and self.snake.y1 == self.food.food_y):
             self.food.food_x, self.food.food_y = self.food.placeFood(
-                self.width, self.height, self.block)
+                self.width, self.height)
             self.score += 1
             self.reward += 100
 
         # Checks out of bounds
-        if self.snake.x1 <= 0 or self.snake.x1 >= self.width or self.snake.y1 <= 0 or self.snake.y1 >= self.height:
+        print([self.food.food_x, self.food.food_y],
+              [self.snake.x1, self.snake.y1])
+        if self.snake.x1 < 0 or self.snake.x1 >= self.width or self.snake.y1 < 0 or self.snake.y1 >= self.height:
             self.reward = -100
             self.game_over = True
 
@@ -223,7 +231,7 @@ class SnakeGame:
                 self.reward = -100
                 self.game_over = True
 
-        self.clock.tick(50)
+        self.clock.tick(10)
         return
 
 
@@ -256,9 +264,9 @@ class Agent(Env):
 
 env = Agent()
 model = PPO('MlpPolicy', env, verbose=1)
-# model.learn(total_timesteps=1000000)
+# model.learn(total_timesteps=100000)
 # model.save("./model/snake_ai_model")
-model.load('./model/snake_ai_model')
+# model.load('./model/snake_ai_model')
 
 # testing episodes
 episodes = 10
