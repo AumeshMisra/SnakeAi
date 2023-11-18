@@ -160,22 +160,22 @@ class SnakeGame:
                 if (self.snake.direction != 2):
                     self.snake.direction = 0
                 else:
-                    self.reward = -10
+                    self.reward += -10
             case 1:
                 if (self.snake.direction != 3):
                     self.snake.direction = 1
                 else:
-                    self.reward -= -10
+                    self.reward += -10
             case 2:
                 if (self.snake.direction != 0):
                     self.snake.direction = 2
                 else:
-                    self.reward -= -10
+                    self.reward += -10
             case 3:
                 if (self.snake.direction != 1):
                     self.snake.direction = 3
                 else:
-                    self.reward -= -10
+                    self.reward += -10
 
     def action(self, action):
         x_before = self.snake.x1
@@ -205,7 +205,7 @@ class SnakeGame:
         if (newDistance < oldDistance):  # if we get closer to food increase reward
             self.reward += 1
         else:
-            self.reward -= -1
+            self.reward += -1
 
         self.snake.snake_body.append([self.snake.x1, self.snake.y1])
         if (len(self.snake.snake_body) > self.score+3):
@@ -213,14 +213,14 @@ class SnakeGame:
 
         # Randomizes food palcement after being eaten
         if (self.snake.x1 == self.food.food_x and self.snake.y1 == self.food.food_y):
-            self.food.food_x, self.food.food_y = self.food.placeFood(
-                self.width, self.height)
             self.score += 1
             self.reward += 100
+            self.food.food_x, self.food.food_y = self.food.placeFood(
+                self.width, self.height)
 
         # Checks out of bounds
-        print([self.food.food_x, self.food.food_y],
-              [self.snake.x1, self.snake.y1])
+        # print([self.food.food_x, self.food.food_y],
+        #       [self.snake.x1, self.snake.y1])
         if self.snake.x1 < 0 or self.snake.x1 >= self.width or self.snake.y1 < 0 or self.snake.y1 >= self.height:
             self.reward = -100
             self.game_over = True
@@ -263,10 +263,10 @@ class Agent(Env):
 
 
 env = Agent()
-model = PPO('MlpPolicy', env, verbose=1)
+# model = PPO('MlpPolicy', env, verbose=1)
 # model.learn(total_timesteps=100000)
 # model.save("./model/snake_ai_model")
-# model.load('./model/snake_ai_model')
+model = PPO.load('./model/snake_ai_model')
 
 # testing episodes
 episodes = 10
@@ -277,8 +277,8 @@ for episode in range(1, episodes):
 
     while not done:
         env.render()
-        # action, _state = model.predict(obs, deterministic=True)
-        action = env.action_space.sample()
+        action, _state = model.predict(obs, deterministic=True)
+        # action = env.action_space.sample()
         obs, reward, done, info = env.step(action)
         score += reward
         # print(env.snake_game.snake.direction)
