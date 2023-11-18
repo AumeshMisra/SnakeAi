@@ -1,19 +1,10 @@
-# from keras import __version__  # nopep8
-# import tensorflow  # nopep8
-# tensorflow.keras.__version__ = __version__  # nopep8
-
 import math
-from rl.agents import DQNAgent
-from rl.policy import BoltzmannQPolicy
-from rl.memory import SequentialMemory
 import pygame
 import numpy as np
 import random
 from gym import Env
 from gym.spaces import Discrete, Box
-from keras.models import Sequential, model_from_json
-from keras.layers import Dense, Flatten
-from keras.optimizers.legacy import Adam
+from stable_baselines3 import PPO
 
 
 # Colors
@@ -53,8 +44,8 @@ class Snake:
 class SnakeGame:
     def __init__(self):
         pygame.init()
-        self.width: int = 200
-        self.height: int = 200
+        self.width: int = 400
+        self.height: int = 400
         self.block = 10
         self.snake = Snake(self.width, self.height)
         self.food = Food(self.width, self.height, self.block)
@@ -157,10 +148,9 @@ class SnakeGame:
         right: int = int(self.snake.direction == 1)
         down: int = int(self.snake.direction == 2)
         left: int = int(self.snake.direction == 3)
-        obs = [self.snake.x1, self.snake.y1, food_above, food_below, food_left, food_right, self.score,
-               delta_left_wall, delta_right_wall, obstacle_up, obstacle_right, obstacle_down, obstacle_left, up, right, down, left,
+        obs = [self.snake.x1, self.snake.y1,
                self.food.food_x, self.food.food_y]
-        obs = np.array(obs)
+        obs = np.array(obs, dtype=np.float32)
         return obs
 
     def is_done(self) -> bool:
@@ -182,8 +172,9 @@ class SnakeGame:
                     self.snake.direction = 3
 
     def action(self, action):
-        y_before = self.snake.x1
-        x_before = self.snake.y1
+        x_before = self.snake.x1
+        y_before = self.snake.y1
+
         self.makeMove(action)
         match self.snake.direction:
             case 0:
@@ -219,20 +210,20 @@ class SnakeGame:
             self.food.food_x, self.food.food_y = self.food.placeFood(
                 self.width, self.height, self.block)
             self.score += 1
-            self.reward += 10
+            self.reward += 100
 
         # Checks out of bounds
         if self.snake.x1 <= 0 or self.snake.x1 >= self.width or self.snake.y1 <= 0 or self.snake.y1 >= self.height:
-            self.reward -= 100
+            self.reward = -100
             self.game_over = True
 
         # Checks for collision with itself
         for body_part in self.snake.snake_body[:-1]:
             if body_part[0] == self.snake.x1 and body_part[1] == self.snake.y1:
-                self.reward -= 100
+                self.reward = -100
                 self.game_over = True
 
-        # self.clock.tick(100)
+        self.clock.tick(50)
         return
 
 
@@ -242,7 +233,9 @@ class Agent(Env):
         self.action_space = Discrete(4)
         # we need to define observation space to be the list of states around our snake, food, and walls
         # the observation space is what we observe with respect to the game
-        self.observation_space = Box(low=-400, high=400, shape=(13,))
+        # self.observation_space = Box(low=-400, high=400, shape=(19,))
+        self.observation_space = Box(
+            low=-np.inf, high=np.inf, shape=(4,), dtype=np.float32)
 
     def render(self):
         self.snake_game.view()
@@ -262,62 +255,24 @@ class Agent(Env):
 
 
 env = Agent()
+model = PPO('MlpPolicy', env, verbose=1)
+# model.learn(total_timesteps=1000000)
+# model.save("./model/snake_ai_model")
+model.load('./model/snake_ai_model')
 
 # testing episodes
-# episodes = 10
-# for episode in range(1, episodes):
-#     state = env.reset()
-#     done = False
-#     score = 0
+episodes = 10
+for episode in range(1, episodes):
+    obs = env.reset()
+    done = False
+    score = 0
 
-#     while not done:
-#         env.render()
-#         action = env.action_space.sample()
-#         n_state, reward, done, info = env.step(action)
-#         score += reward
-#         # print(env.snake_game.snake.direction)
-#         # print(n_state)
-#     print('Episode:{} Score:{}'.format(episode, score))
-
-
-def build_model(actions):
-    model = Sequential()
-    model.add(Dense(128, activation='relu',
-              input_shape=(1, 19), name='hl1'))
-    model.add(Dense(128, activation='relu', name='hl2'))
-    model.add(Dense(128, activation='relu', name='hl3'))
-    model.add(Flatten())
-    model.add(Dense(actions, activation='softmax', name='hl4'))
-    return model
-
-
-states = env.observation_space.shape
-actions = env.action_space.n
-model = build_model(actions)
-# print(model.summary())
-
-
-def build_agent(model, actions):
-    policy = BoltzmannQPolicy()
-    memory = SequentialMemory(limit=2500, window_length=1)
-    dqn = DQNAgent(model=model, memory=memory, policy=policy,
-                   nb_actions=actions, nb_steps_warmup=100, gamma=0.95, batch_size=500)
-    # dqn.model.epsilon =
-    return dqn
-
-
-json_file = open('./model/model.json', 'r')
-loaded_model_json = json_file.read()
-json_file.close()
-loaded_model = model_from_json(loaded_model_json)
-dqn = build_agent(loaded_model, actions)
-dqn.model.load_weights('./weights/weights_3.h5')
-# # dqn.model.load('./weights/weights.keras')
-# # print(dqn)
-dqn.compile(Adam(learning_rate=0.00025), metrics=['mse'])
-dqn.fit(env, nb_steps=100000, visualize=False, verbose=1)
-
-model_json = dqn.model.to_json()
-with open("./model/model.json", "w") as json_file:
-    json_file.write(model_json)
-dqn.model.save_weights('./weights/weights_4.h5', overwrite=True)
+    while not done:
+        env.render()
+        action, _state = model.predict(obs, deterministic=True)
+        # action = env.action_space.sample()
+        obs, reward, done, info = env.step(action)
+        score += reward
+        # print(env.snake_game.snake.direction)
+        # print(n_state)
+    print('Episode:{} Score:{}'.format(episode, score))
