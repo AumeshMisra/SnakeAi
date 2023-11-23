@@ -211,8 +211,6 @@ class SnakeGame:
                 self.width, self.height)
 
         # Checks out of bounds
-        # print([self.food.food_x, self.food.food_y],
-        #       [self.snake.x1, self.snake.y1])
         if self.snake.x1 < 0 or self.snake.x1 >= self.width or self.snake.y1 < 0 or self.snake.y1 >= self.height:
             self.reward = -100
             self.game_over = True
@@ -271,10 +269,7 @@ for episode in range(1, episodes):
 
     while not done:
         action, _state = model.predict(obs, deterministic=True)
-        # action = env.action_space.sample()
         obs, reward, done, info = env.step(action)
         score += reward
         env.render()
-        # print(env.snake_game.snake.direction)
-        # print(n_state)
     print('Episode:{} Score:{}'.format(episode, score))
