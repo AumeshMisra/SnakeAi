@@ -5,6 +5,8 @@ import random
 from gym import Env
 from gym.spaces import Discrete, Box
 from stable_baselines3 import PPO
+import argparse
+import sys
 
 
 # Colors
@@ -169,7 +171,7 @@ class SnakeGame:
                 if (self.snake.direction != 1):
                     self.snake.direction = 3
 
-    def action(self, action):
+    def action(self, action, mode):
         x_before = self.snake.x1
         y_before = self.snake.y1
 
@@ -221,19 +223,21 @@ class SnakeGame:
                 self.reward = -100
                 self.game_over = True
 
-        self.clock.tick(10)
+        if (mode != 'train'):
+            self.clock.tick(10)
+
         return
 
 
 class Agent(Env):
-    def __init__(self):
+    mode: str
+
+    def __init__(self, mode='train'):
         self.snake_game = SnakeGame()
         self.action_space = Discrete(4)
-        # we need to define observation space to be the list of states around our snake, food, and walls
-        # the observation space is what we observe with respect to the game
-        # self.observation_space = Box(low=-400, high=400, shape=(19,))
         self.observation_space = Box(
             low=-np.inf, high=np.inf, shape=(4,), dtype=np.float32)
+        self.mode = mode
 
     def render(self):
         self.snake_game.view()
@@ -245,31 +249,46 @@ class Agent(Env):
         return obs
 
     def step(self, action: int):
-        self.snake_game.action(action)
+        self.snake_game.action(action, self.mode)
         obs = self.snake_game.observe()
         reward = self.snake_game.evaluate()
         done = self.snake_game.is_done()
         return obs, reward, done, {}
 
 
-env = Agent()
-# model = PPO('MlpPolicy', env, verbose=1)
-model = PPO.load('./model/snake_ai_model')
-# model.learn(total_timesteps=100000)
-# model.save("./model/snake_ai_model")
-# model = PPO.load('./model/snake_ai_model')
+parser = argparse.ArgumentParser()
+subparsers = parser.add_subparsers(
+    title='Subcommands', dest='subcommand', help='Available subcommands')
+train_parser = subparsers.add_parser('train', help='train a model')
+train_parser.add_argument('fileName', type=str,
+                          help='File to train the model with')
 
-# testing episodes
-episodes = 10
-for episode in range(1, episodes):
-    obs = env.reset()
-    done = False
-    score = 0
-    env.render()
+load_parser = subparsers.add_parser('load')
+load_parser.add_argument('fileName', type=str,
+                         help='File to train the model with')
 
-    while not done:
-        action, _state = model.predict(obs, deterministic=True)
-        obs, reward, done, info = env.step(action)
-        score += reward
-        env.render()
-    print('Episode:{} Score:{}'.format(episode, score))
+if __name__ == '__main__':
+    args = parser.parse_args()
+    env = Agent(args.subcommand)
+
+    if (args.subcommand == 'train'):
+        # Training new model
+        model = PPO('MlpPolicy', env, verbose=1)
+        model.learn(total_timesteps=10000)
+        model.save(args.fileName)
+    elif (args.subcommand == 'load'):
+        # Testing model
+        model = PPO.load(args.fileName)
+        episodes = 10
+        for episode in range(1, episodes):
+            obs = env.reset()
+            done = False
+            score = 0
+            env.render()
+
+            while not done:
+                action, _state = model.predict(obs, deterministic=True)
+                obs, reward, done, info = env.step(action)
+                score += reward
+                env.render()
+            print('Episode:{} Score:{}'.format(episode, score))
