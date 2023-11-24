@@ -22,7 +22,7 @@ if __name__ == '__main__':
     if (args.subcommand == 'train'):
         # Training new model
         model = PPO('MlpPolicy', env, verbose=1)
-        model.learn(total_timesteps=10000)
+        model.learn(total_timesteps=100000)
         model.save(args.fileName)
     elif (args.subcommand == 'load'):
         # Testing model
