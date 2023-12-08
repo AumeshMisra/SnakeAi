@@ -1,7 +1,9 @@
 
 from stable_baselines3 import PPO
+from stable_baselines3.common.vec_env import VecMonitor, SubprocVecEnv
 import argparse
-from agent import Agent
+from agent import Agent, SaveOnBestTrainingRewardCallback
+import os
 
 
 parser = argparse.ArgumentParser()
@@ -16,14 +18,27 @@ load_parser.add_argument('fileName', type=str,
                          help='File to train the model with')
 
 if __name__ == '__main__':
+    # Setting up params
     args = parser.parse_args()
-    env = Agent(args.subcommand)
+    log_dir = "log/"
+    os.makedirs(log_dir, exist_ok=True)
+    num_cpu = 4
+
+    env = VecMonitor(SubprocVecEnv(
+        [Agent(args.subcommand) for _ in range(num_cpu)]))
+    # env = Agent(args.subcommand)
 
     if (args.subcommand == 'train'):
         # Training new model
-        model = PPO('MlpPolicy', env, verbose=1)
-        model.learn(total_timesteps=100000)
+        model = PPO('MlpPolicy', env, verbose=1, tensorboard_log="./board/")
+
+        print('--------Starting Training--------')
+        callback = SaveOnBestTrainingRewardCallback(
+            check_freq=5000, log_dir=log_dir)
+        model.learn(total_timesteps=1000000, callback=callback)
         model.save(args.fileName)
+        print('--------Finished Training--------')
+
     elif (args.subcommand == 'load'):
         # Testing model
         model = PPO.load(args.fileName)
