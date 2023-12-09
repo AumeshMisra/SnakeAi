@@ -36,15 +36,17 @@ class Snake:
 
 
 class SnakeGame:
-    def __init__(self):
+    def __init__(self, mode="train"):
         pygame.init()
         self.width: int = 400
         self.height: int = 400
         self.block = 10
         self.snake = Snake(self.width, self.height)
         self.food = Food(self.width, self.height)
+        self.mode = mode
 
-        self.clock = pygame.time.Clock()
+        if (mode != "train"):
+            self.clock = pygame.time.Clock()
         self.dis = None
 
         self.score = 0
@@ -124,13 +126,13 @@ class SnakeGame:
 
         wall_left, wall_right, wall_up, wall_down = 0, 0, 0, 0
 
-        if delta_left_wall == -10:
+        if delta_left_wall == 0:
             wall_left = 1
         if delta_right_wall == 10:
             wall_right = 1
         if delta_bottom == 10:
             wall_down = 1
-        if delta_top == 10:
+        if delta_top == 0:
             wall_up = 1
 
         obstacle_left = int(wall_left or body_left)
@@ -143,7 +145,7 @@ class SnakeGame:
         down: int = int(self.snake.direction == 2)
         left: int = int(self.snake.direction == 3)
         obs = [self.snake.x1, self.snake.y1,
-               self.food.food_x, self.food.food_y]
+               self.food.food_x, self.food.food_y, up, right, down, left, obstacle_left, obstacle_right, obstacle_up, obstacle_down]
         obs = np.array(obs, dtype=np.float32)
         return obs
 
@@ -165,7 +167,7 @@ class SnakeGame:
                 if (self.snake.direction != 1):
                     self.snake.direction = 3
 
-    def action(self, action, mode):
+    def action(self, action):
         x_before = self.snake.x1
         y_before = self.snake.y1
 
@@ -217,7 +219,7 @@ class SnakeGame:
                 self.reward = -100
                 self.game_over = True
 
-        if (mode != 'train'):
+        if (self.mode != 'train'):
             self.clock.tick(10)
 
         return
