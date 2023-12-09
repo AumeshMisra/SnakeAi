@@ -16,7 +16,7 @@ class Agent(Env):
         self.snake_game = SnakeGame(mode)
         self.action_space = Discrete(4)
         self.observation_space = Box(
-            low=-np.inf, high=np.inf, shape=(8,), dtype=np.float32)
+            low=-np.inf, high=np.inf, shape=(12,), dtype=np.float32)
         self.mode = mode
 
     def render(self):

@@ -27,11 +27,12 @@ if __name__ == '__main__':
     if (args.subcommand == 'train'):
         # Training new model
         env = Monitor(env=Agent(args.subcommand), filename=log_dir)
-        model = PPO('MlpPolicy', env, verbose=1, tensorboard_log="./board/")
+        model = PPO('MlpPolicy', env, verbose=1,
+                    tensorboard_log="./board/", learning_rate=0.00003)
 
         print('--------Starting Training--------')
         callback = SaveOnBestTrainingRewardCallback(
-            check_freq=3000, log_dir=log_dir)
+            5000, log_dir=log_dir)
         model.learn(total_timesteps=1000000, callback=callback)
         model.save(args.fileName)
         print('--------Finished Training--------')

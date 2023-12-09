@@ -126,13 +126,13 @@ class SnakeGame:
 
         wall_left, wall_right, wall_up, wall_down = 0, 0, 0, 0
 
-        if delta_left_wall == -10:
+        if delta_left_wall == 0:
             wall_left = 1
         if delta_right_wall == 10:
             wall_right = 1
         if delta_bottom == 10:
             wall_down = 1
-        if delta_top == 10:
+        if delta_top == 0:
             wall_up = 1
 
         obstacle_left = int(wall_left or body_left)
@@ -145,7 +145,7 @@ class SnakeGame:
         down: int = int(self.snake.direction == 2)
         left: int = int(self.snake.direction == 3)
         obs = [self.snake.x1, self.snake.y1,
-               self.food.food_x, self.food.food_y, up, right, down, left]
+               self.food.food_x, self.food.food_y, up, right, down, left, obstacle_left, obstacle_right, obstacle_up, obstacle_down]
         obs = np.array(obs, dtype=np.float32)
         return obs
 
@@ -210,13 +210,13 @@ class SnakeGame:
 
         # Checks out of bounds
         if self.snake.x1 < 0 or self.snake.x1 >= self.width or self.snake.y1 < 0 or self.snake.y1 >= self.height:
-            self.reward = -500
+            self.reward = -100
             self.game_over = True
 
         # Checks for collision with itself
         for body_part in self.snake.snake_body[:-1]:
             if body_part[0] == self.snake.x1 and body_part[1] == self.snake.y1:
-                self.reward = -500
+                self.reward = -100
                 self.game_over = True
 
         if (self.mode != 'train'):
