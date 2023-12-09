@@ -36,15 +36,17 @@ class Snake:
 
 
 class SnakeGame:
-    def __init__(self):
+    def __init__(self, mode="train"):
         pygame.init()
         self.width: int = 400
         self.height: int = 400
         self.block = 10
         self.snake = Snake(self.width, self.height)
         self.food = Food(self.width, self.height)
+        self.mode = mode
 
-        self.clock = pygame.time.Clock()
+        if (mode != "train"):
+            self.clock = pygame.time.Clock()
         self.dis = None
 
         self.score = 0
@@ -143,7 +145,7 @@ class SnakeGame:
         down: int = int(self.snake.direction == 2)
         left: int = int(self.snake.direction == 3)
         obs = [self.snake.x1, self.snake.y1,
-               self.food.food_x, self.food.food_y]
+               self.food.food_x, self.food.food_y, up, right, down, left]
         obs = np.array(obs, dtype=np.float32)
         return obs
 
@@ -165,7 +167,7 @@ class SnakeGame:
                 if (self.snake.direction != 1):
                     self.snake.direction = 3
 
-    def action(self, action, mode):
+    def action(self, action):
         x_before = self.snake.x1
         y_before = self.snake.y1
 
@@ -208,16 +210,16 @@ class SnakeGame:
 
         # Checks out of bounds
         if self.snake.x1 < 0 or self.snake.x1 >= self.width or self.snake.y1 < 0 or self.snake.y1 >= self.height:
-            self.reward = -100
+            self.reward = -500
             self.game_over = True
 
         # Checks for collision with itself
         for body_part in self.snake.snake_body[:-1]:
             if body_part[0] == self.snake.x1 and body_part[1] == self.snake.y1:
-                self.reward = -100
+                self.reward = -500
                 self.game_over = True
 
-        if (mode != 'train'):
+        if (self.mode != 'train'):
             self.clock.tick(10)
 
         return

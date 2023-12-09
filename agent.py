@@ -1,5 +1,6 @@
-from gym import Env
-from gym.spaces import Discrete, Box
+from gymnasium import Env
+# from gym.spaces import Discrete, Box
+from gymnasium.spaces import Discrete, Box
 import numpy as np
 from snake_env import SnakeGame
 from stable_baselines3.common.callbacks import BaseCallback
@@ -11,27 +12,28 @@ class Agent(Env):
     mode: str
 
     def __init__(self, mode='train'):
-        self.snake_game = SnakeGame()
+        super(Agent, self).__init__()
+        self.snake_game = SnakeGame(mode)
         self.action_space = Discrete(4)
         self.observation_space = Box(
-            low=-np.inf, high=np.inf, shape=(4,), dtype=np.float32)
+            low=-np.inf, high=np.inf, shape=(8,), dtype=np.float32)
         self.mode = mode
 
     def render(self):
         self.snake_game.view()
 
-    def reset(self):
+    def reset(self, seed=None, options=None):
         del self.snake_game
-        self.snake_game = SnakeGame()
+        self.snake_game = SnakeGame(self.mode)
         obs = self.snake_game.observe()
-        return obs
+        return obs, {}
 
     def step(self, action: int):
-        self.snake_game.action(action, self.mode)
+        self.snake_game.action(action)
         obs = self.snake_game.observe()
         reward = self.snake_game.evaluate()
         done = self.snake_game.is_done()
-        return obs, reward, done, {}
+        return obs, reward, done, False, {}
 
 
 # Copied from documentation https://stable-baselines.readthedocs.io/en/master/guide/examples.html

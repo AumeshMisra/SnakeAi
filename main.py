@@ -1,9 +1,10 @@
 
 from stable_baselines3 import PPO
-from stable_baselines3.common.vec_env import VecMonitor, SubprocVecEnv
+from stable_baselines3.common.monitor import Monitor
 import argparse
 from agent import Agent, SaveOnBestTrainingRewardCallback
 import os
+import gym
 
 
 parser = argparse.ArgumentParser()
@@ -22,36 +23,33 @@ if __name__ == '__main__':
     args = parser.parse_args()
     log_dir = "log/"
     os.makedirs(log_dir, exist_ok=True)
-    num_cpu = 4
-
-    env = VecMonitor(SubprocVecEnv(
-        [Agent(args.subcommand) for _ in range(num_cpu)]))
-    # env = Agent(args.subcommand)
 
     if (args.subcommand == 'train'):
         # Training new model
+        env = Monitor(env=Agent(args.subcommand), filename=log_dir)
         model = PPO('MlpPolicy', env, verbose=1, tensorboard_log="./board/")
 
         print('--------Starting Training--------')
         callback = SaveOnBestTrainingRewardCallback(
-            check_freq=5000, log_dir=log_dir)
+            check_freq=3000, log_dir=log_dir)
         model.learn(total_timesteps=1000000, callback=callback)
         model.save(args.fileName)
         print('--------Finished Training--------')
 
     elif (args.subcommand == 'load'):
+        env = Agent(args.subcommand)
         # Testing model
         model = PPO.load(args.fileName)
         episodes = 10
         for episode in range(1, episodes):
-            obs = env.reset()
+            obs, _info = env.reset()
             done = False
             score = 0
             env.render()
 
             while not done:
                 action, _state = model.predict(obs, deterministic=True)
-                obs, reward, done, info = env.step(action)
+                obs, reward, done, truncated, info = env.step(action)
                 score += reward
                 env.render()
             print('Episode:{} Score:{}'.format(episode, score))
